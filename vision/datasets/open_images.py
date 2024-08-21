@@ -8,11 +8,12 @@ class OpenImagesDataset:
 
     def __init__(self, root,
                  transform=None, target_transform=None,
-                 dataset_type="train", balance_data=False):
+                 dataset_type="train", balance_data=False, image_extension='jpg'):
         self.root = pathlib.Path(root)
         self.transform = transform
         self.target_transform = target_transform
         self.dataset_type = dataset_type.lower()
+        self.image_extension = image_extension
 
         self.data, self.class_names, self.class_dict = self._read_data()
         self.balance_data = balance_data
@@ -93,7 +94,7 @@ class OpenImagesDataset:
         return "\n".join(content)
 
     def _read_image(self, image_id):
-        image_file = self.root / self.dataset_type / f"{image_id}.jpg"
+        image_file = self.root / self.dataset_type / f"{image_id}.{self.image_extension}"
         image = cv2.imread(str(image_file))
         if image.shape[2] == 1:
             image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)

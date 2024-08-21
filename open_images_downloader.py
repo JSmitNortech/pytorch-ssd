@@ -168,9 +168,9 @@ if __name__ == '__main__':
 
         logging.warning(f"{dataset_type} bounding boxes size: {annotations.shape[0]}")
         logging.warning("Approximate Image Stats: ")
-        log_counts(annotations.drop_duplicates(["ImageID", "ClassName"])["ClassName"])
+        annotations.drop_duplicates(["ImageID", "ClassName"])["ClassName"]
         logging.warning("Label distribution: ")
-        log_counts(annotations['ClassName'])
+        annotations['ClassName']
 
         logging.warning(f"Shuffle dataset.")
 

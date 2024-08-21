@@ -97,6 +97,8 @@ parser.add_argument('--use_cuda', default=True, type=str2bool,
 parser.add_argument('--checkpoint_folder', default='models/',
                     help='Directory for saving checkpoint models')
 
+parser.add_argument('--image_extension', default='jpg', help='Image extension used by the images in the training dataset. Eg. "jpg", "png" etc.')
+
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -215,7 +217,7 @@ if __name__ == '__main__':
         elif args.dataset_type == 'open_images':
             dataset = OpenImagesDataset(dataset_path,
                  transform=train_transform, target_transform=target_transform,
-                 dataset_type="train", balance_data=args.balance_data)
+                 dataset_type="train", balance_data=args.balance_data, image_extension=args.image_extension)
             label_file = os.path.join(args.checkpoint_folder, "open-images-model-labels.txt")
             store_labels(label_file, dataset.class_names)
             logging.info(dataset)
@@ -237,7 +239,7 @@ if __name__ == '__main__':
     elif args.dataset_type == 'open_images':
         val_dataset = OpenImagesDataset(dataset_path,
                                         transform=test_transform, target_transform=target_transform,
-                                        dataset_type="test")
+                                        dataset_type="test", image_extension=args.image_extension)
         logging.info(val_dataset)
     logging.info("validation dataset size: {}".format(len(val_dataset)))
 
