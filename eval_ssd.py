@@ -77,10 +77,6 @@ parser.add_argument(
     default="jpg",
     help='Image extension used by the images in the training dataset. Eg. "jpg", "png" etc.',
 )
-args = parser.parse_args()
-DEVICE = torch.device(
-    "cuda:0" if torch.cuda.is_available() and args.use_cuda else "cpu"
-)
 
 
 def group_annotation_by_class(dataset):
@@ -177,39 +173,56 @@ def compute_average_precision_per_class(
         return measurements.compute_average_precision(precision, recall)
 
 
-if __name__ == "__main__":
-    eval_path = pathlib.Path(args.eval_dir)
+use_cuda = True
+
+
+def eval_dataset(
+    eval_dir,
+    dataset,
+    dataset_type,
+    nms_method,
+    image_extension,
+    mb2_width_mult,
+    net_type,
+    trained_model,
+    iou_threshold,
+    use_2007_metric,
+):
+
+    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() and use_cuda else "cpu")
+
+    eval_path = pathlib.Path(eval_dir)
     eval_path.mkdir(exist_ok=True)
     timer = Timer()
     # class_names = [name.strip() for name in open(args.label_file).readlines()]
 
     class_names = ["BACKGROUND", "Person"]
 
-    if args.dataset_type == "voc":
-        dataset = VOCDataset(args.dataset, is_test=True)
-    elif args.dataset_type == "open_images":
+    if dataset_type == "voc":
+        dataset = VOCDataset(dataset, is_test=True)
+    elif dataset_type == "open_images":
         dataset = OpenImagesDataset(
-            args.dataset, dataset_type="test", image_extension=args.image_extension
+            dataset, dataset_type="test", image_extension=image_extension
         )
 
     true_case_stat, all_gb_boxes, all_difficult_cases = group_annotation_by_class(
         dataset
     )
-    if args.net == "vgg16-ssd":
+    if net_type == "vgg16-ssd":
         net = create_vgg_ssd(len(class_names), is_test=True)
-    elif args.net == "mb1-ssd":
+    elif net_type == "mb1-ssd":
         net = create_mobilenetv1_ssd(len(class_names), is_test=True)
-    elif args.net == "mb1-ssd-lite":
+    elif net_type == "mb1-ssd-lite":
         net = create_mobilenetv1_ssd_lite(len(class_names), is_test=True)
-    elif args.net == "sq-ssd-lite":
+    elif net_type == "sq-ssd-lite":
         net = create_squeezenet_ssd_lite(len(class_names), is_test=True)
-    elif args.net == "mb2-ssd-lite":
+    elif net_type == "mb2-ssd-lite":
         net = create_mobilenetv2_ssd_lite(
-            len(class_names), width_mult=args.mb2_width_mult, is_test=True
+            len(class_names), width_mult=mb2_width_mult, is_test=True
         )
-    elif args.net == "mb3-large-ssd-lite":
+    elif net_type == "mb3-large-ssd-lite":
         net = create_mobilenetv3_large_ssd_lite(len(class_names), is_test=True)
-    elif args.net == "mb3-small-ssd-lite":
+    elif net_type == "mb3-small-ssd-lite":
         net = create_mobilenetv3_small_ssd_lite(len(class_names), is_test=True)
     else:
         logging.fatal(
@@ -219,32 +232,30 @@ if __name__ == "__main__":
         sys.exit(1)
 
     timer.start("Load Model")
-    net.load(args.trained_model)
+    net.load(trained_model)
     net = net.to(DEVICE)
     print(f'It took {timer.end("Load Model")} seconds to load the model.')
-    if args.net == "vgg16-ssd":
-        predictor = create_vgg_ssd_predictor(
-            net, nms_method=args.nms_method, device=DEVICE
-        )
-    elif args.net == "mb1-ssd":
+    if net_type == "vgg16-ssd":
+        predictor = create_vgg_ssd_predictor(net, nms_method=nms_method, device=DEVICE)
+    elif net_type == "mb1-ssd":
         predictor = create_mobilenetv1_ssd_predictor(
-            net, nms_method=args.nms_method, device=DEVICE
+            net, nms_method=nms_method, device=DEVICE
         )
-    elif args.net == "mb1-ssd-lite":
+    elif net_type == "mb1-ssd-lite":
         predictor = create_mobilenetv1_ssd_lite_predictor(
-            net, nms_method=args.nms_method, device=DEVICE
+            net, nms_method=nms_method, device=DEVICE
         )
-    elif args.net == "sq-ssd-lite":
+    elif net_type == "sq-ssd-lite":
         predictor = create_squeezenet_ssd_lite_predictor(
-            net, nms_method=args.nms_method, device=DEVICE
+            net, nms_method=nms_method, device=DEVICE
         )
     elif (
-        args.net == "mb2-ssd-lite"
-        or args.net == "mb3-large-ssd-lite"
-        or args.net == "mb3-small-ssd-lite"
+        net_type == "mb2-ssd-lite"
+        or net_type == "mb3-large-ssd-lite"
+        or net_type == "mb3-small-ssd-lite"
     ):
         predictor = create_mobilenetv2_ssd_lite_predictor(
-            net, nms_method=args.nms_method, device=DEVICE
+            net, nms_method=nms_method, device=DEVICE
         )
     else:
         logging.fatal(
@@ -297,10 +308,29 @@ if __name__ == "__main__":
             all_gb_boxes[class_index],
             all_difficult_cases[class_index],
             prediction_path,
-            args.iou_threshold,
-            args.use_2007_metric,
+            iou_threshold,
+            use_2007_metric,
         )
         aps.append(ap)
         print(f"{class_name}: {ap}")
 
     print(f"\nAverage Precision Across All Classes:{sum(aps)/len(aps)}")
+
+    return sum(aps) / len(aps)
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    use_cuda = args.use_cuda
+    eval_dataset(
+        args.eval_dir,
+        args.dataset,
+        args.dataset_type,
+        args.nms_method,
+        args.image_extension,
+        args.mb2_width_mult,
+        args.net,
+        args.trained_model,
+        args.iou_threshold,
+        args.use_2007_metric,
+    )
