@@ -7,6 +7,7 @@ import itertools
 import torch
 from torch.utils.data import DataLoader, ConcatDataset
 from torch.optim.lr_scheduler import CosineAnnealingLR, MultiStepLR
+from pathlib import Path
 
 from vision.utils.misc import str2bool, Timer, freeze_net_layers, store_labels
 from vision.ssd.ssd import MatchPrior
@@ -39,6 +40,7 @@ parser.add_argument(
 )
 
 parser.add_argument("--datasets", nargs="+", help="Dataset directory path")
+parser.add_argument("--dataset_dir", nargs="+", help="datasets parent directory")
 parser.add_argument("--validation_dataset", help="Dataset directory path")
 parser.add_argument(
     "--balance_data",
@@ -239,6 +241,13 @@ def test(loader, net, criterion, device):
     )
 
 
+def parse_datasets(dataset_dir):
+    dataset_list = os.listdir(dataset_dir)
+    dataset_list = [Path(dataset_dir, subset) for subset in dataset_list]
+
+    return dataset_list
+
+
 if __name__ == "__main__":
     timer = Timer()
 
@@ -283,7 +292,16 @@ if __name__ == "__main__":
 
     logging.info("Prepare training datasets.")
     datasets = []
-    for dataset_path in args.datasets:
+
+    dataset_list = args.datasets
+
+    if args.dataset_dir:
+        dataset_list = []
+        for set_dir in args.dataset_dir:
+            # dataset_list.conca parse_datasets(set_dir)
+            dataset_list += parse_datasets(set_dir)
+
+    for dataset_path in dataset_list:
         if args.dataset_type == "voc":
             dataset = VOCDataset(
                 dataset_path,
@@ -319,22 +337,26 @@ if __name__ == "__main__":
         train_dataset, args.batch_size, num_workers=args.num_workers, shuffle=True
     )
     logging.info("Prepare Validation datasets.")
-    if args.dataset_type == "voc":
-        val_dataset = VOCDataset(
-            args.validation_dataset,
-            transform=test_transform,
-            target_transform=target_transform,
-            is_test=True,
-        )
-    elif args.dataset_type == "open_images":
-        val_dataset = OpenImagesDataset(
-            dataset_path,
-            transform=test_transform,
-            target_transform=target_transform,
-            dataset_type="test",
-            image_extension=args.image_extension,
-        )
-        logging.info(val_dataset)
+    val_sets = []
+    for dataset_path in dataset_list:
+        if args.dataset_type == "voc":
+            val_dataset = VOCDataset(
+                args.validation_dataset,
+                transform=test_transform,
+                target_transform=target_transform,
+                is_test=True,
+            )
+        elif args.dataset_type == "open_images":
+            val_dataset = OpenImagesDataset(
+                dataset_path,
+                transform=test_transform,
+                target_transform=target_transform,
+                dataset_type="test",
+                image_extension=args.image_extension,
+            )
+            logging.info(val_dataset)
+        val_sets.append(val_dataset)
+    val_dataset = ConcatDataset(val_sets)
     logging.info("validation dataset size: {}".format(len(val_dataset)))
 
     val_loader = DataLoader(
