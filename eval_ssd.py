@@ -298,6 +298,7 @@ def eval_dataset(
                 image_id = dataset.ids[int(sub[i, 0])]
                 print(image_id + " " + " ".join([str(v) for v in prob_box]), file=f)
     aps = []
+    num_gt = 0
     print("\n\nAverage Precision Per-class:")
     for class_index, class_name in enumerate(class_names):
         if class_index == 0:
@@ -311,12 +312,14 @@ def eval_dataset(
             iou_threshold,
             use_2007_metric,
         )
+
+        num_gt += len(all_gb_boxes[class_index])
         aps.append(ap)
         print(f"{class_name}: {ap}")
 
     print(f"\nAverage Precision Across All Classes:{sum(aps)/len(aps)}")
 
-    return sum(aps) / len(aps)
+    return (sum(aps) / len(aps)), num_gt
 
 
 if __name__ == "__main__":
